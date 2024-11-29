@@ -17,6 +17,7 @@ const init = async () => {
 
 	await goToHomepage(page);
 	await getData(page);
+    browser.close();
 };
 
 const goToHomepage = async (page) => {
@@ -81,7 +82,10 @@ const getData = async (page) => {
                 if (releaseDateElement && releaseDateElement.nextSibling) {
                     const rawText = releaseDateElement.nextSibling.textContent.trim();
                     const match = rawText.match(/[A-Za-z]{3} \d{1,2}, \d{4}/);
-                    return match ? match[0] : null; 
+                    if (match) {
+                        const date = new Date(match[0]);
+                        return date.toISOString().split('T')[0];
+                    }
                 }
                 return null; 
             })
@@ -120,9 +124,32 @@ const getData = async (page) => {
                 }
                 return null;
             }) 
+
+            //scraping yesterdays peak concurrent players
+            const players = await page.evaluate(() => {
+                const playersElement = Array.from(document.querySelectorAll("strong")).find(
+                    (el) => el.textContent.trim() === "Peak concurrent players yesterday"
+                );
+                if (playersElement && playersElement.nextSibling) {       
+                    const playersText = playersElement.nextSibling.textContent.trim();
+                    const cleanedPlayersText = playersText.replace(/[^0-9,]/g, '').replace(/,/g, '');
+                    return parseInt(cleanedPlayersText, 10);
+                }
+                return null;
+            })
             
+            //calculating yesterdays date 
+            const getYesterdayDate = () => {
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                return yesterday.toISOString().split('T')[0];
+            };
+            const yesterdaysDate = getYesterdayDate();
             
-            
+            const playerPeak = {
+                players: players,
+                date: yesterdaysDate
+            }
 
 			dataArray.push({
 				gameName: gameName,
@@ -130,7 +157,8 @@ const getData = async (page) => {
                 tags: tags,
                 releaseDate: releaseDate,
                 price: price,
-                owners: owners
+                owners: owners,
+                playerPeak: playerPeak 
 			});
 		}
 	}
