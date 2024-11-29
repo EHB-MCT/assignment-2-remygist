@@ -44,6 +44,7 @@ const getData = async (page) => {
 		});
 		//TODO: get genre + tags + release date + price + peak concurrent players
 
+        //scraping gameName
 		const gameNameElement = await page.$("h3");
 		if (gameNameElement) {
 			const gameName = await page.evaluate(
@@ -51,6 +52,7 @@ const getData = async (page) => {
 				gameNameElement
 			);
 
+            //scraping genres
 			const genres = await page.evaluate(() => {
 				const genreLabel = Array.from(document.querySelectorAll("strong")).find(
 					(el) => el.textContent.trim() === "Genre:"
@@ -65,9 +67,70 @@ const getData = async (page) => {
 				return [];
 			});
 
+            //scraping tags
+            const tagsElement = await page.$$( '.p-r-30 [href^="/tag/"]');
+            const tags = await Promise.all(
+                tagsElement.map(tag => page.evaluate(el => el.textContent.trim(), tag)) // Get the inner text of each tag
+            );
+
+            //scraping release date
+            const releaseDate = await page.evaluate(() => {
+                const releaseDateElement = Array.from(document.querySelectorAll("strong")).find(
+                    (el) => el.textContent.trim() === "Release date" 
+                ); 
+                if (releaseDateElement && releaseDateElement.nextSibling) {
+                    const rawText = releaseDateElement.nextSibling.textContent.trim();
+                    const match = rawText.match(/[A-Za-z]{3} \d{1,2}, \d{4}/);
+                    return match ? match[0] : null; 
+                }
+                return null; 
+            })
+
+            //scraping price
+            const price = await page.evaluate(() => {
+                const priceElement = Array.from(document.querySelectorAll("strong")).find(
+                    (el) => el.textContent.trim() === "Price:"
+                );
+                if (priceElement && priceElement.nextSibling) {                    
+                    const priceText = priceElement.nextSibling.textContent.trim();
+                    return priceText
+                }
+                return null;
+            })
+
+            //scraping owners
+            const owners = await page.evaluate(() => {
+                const ownersElement = Array.from(document.querySelectorAll("strong")).find(
+                    (el) => el.textContent.trim() === "Owners"
+                );
+                if (ownersElement && ownersElement.nextSibling) {                    
+                    // Get the ownership range as a string
+                    const ownersText = ownersElement.nextSibling.textContent.trim();
+                    console.log("Owners text:", ownersText); // Debug output
+                    
+                    // Use regex to extract the numbers from the range
+                    const match = ownersText.match(/([\d,]+)\s*\.\.\s*([\d,]+)/);
+                    if (match) {
+                        const min = parseInt(match[1].replace(/,/g, ''), 10);
+                        const max = parseInt(match[2].replace(/,/g, ''), 10);
+                        const average = Math.round((min + max) / 2);
+                        return { min, max, average };
+                    }
+                    return { min: null, max: null, average: null }; // Handle cases with unexpected format
+                }
+                return null;
+            }) 
+            
+            
+            
+
 			dataArray.push({
 				gameName: gameName,
 				genres: genres,
+                tags: tags,
+                releaseDate: releaseDate,
+                price: price,
+                owners: owners
 			});
 		}
 	}
