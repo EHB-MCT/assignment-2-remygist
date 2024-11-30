@@ -14,13 +14,10 @@
 ## File structure
 ```
 steam-game-data/
-├── config/
-│   └── db.js                  # Database connection setup
 ├── scrapers/
 │   └── scraper.js      # All scraping and data handling logic
 ├── .env                       # Environment variables (e.g., database URL)
 ├── .gitignore                 # Ignore sensitive files in git
-├── app.js                     # Main application entry point
 ├── package.json               # Project metadata and dependencies
 └── README.md                  # Project documentation
 ```
@@ -54,8 +51,17 @@ The data that is being extracted are:
 - Peak concurrent players (yesterday's stats)
 This data is then structured and stored in a object in order to store it into a database.
 
+- Storing data into database:
+Once all the data is collected, the app will store the data into a [MongoDB](https://www.mongodb.com) database.
+But before storing new data into the database, there are a few verifications to be done:
+   1. Check if all fields are filled with data, if it doesn't it will skip to the next data record.
+   2. Check if the data is a duplicate:
+      - If it is not a duplicate, it will insert the new record into the database. 
+      - If it is a duplicate, the app will check wether the data is up to date. If it is, it goes to the next record, if it is not the data record will be updated.
+
 ## Sources
 - [Puppeteer](https://pptr.dev/)
 - [dotenv](https://www.npmjs.com/package/dotenv)
+- [MongoDB](https://www.mongodb.com)
 
 
