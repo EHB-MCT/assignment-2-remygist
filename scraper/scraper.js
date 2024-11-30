@@ -1,7 +1,23 @@
 "use strict";
-
 import "dotenv/config";
 import puppeteer from "puppeteer";
+import express from 'express';
+import cors from 'cors';
+import { MongoClient, ServerApiVersion } from "mongodb";
+
+const uri = process.env.MONGODB_URI
+const app = express();
+const port = 3000;
+app.use(express.json());
+app.use(cors());
+
+const client = new MongoClient(uri, {
+    serverApi: {
+      version: ServerApiVersion.v1,
+      strict: true,
+      deprecationErrors: true,
+    }
+  });
 
 const linksArray = [];
 const dataArray = [];
@@ -16,8 +32,9 @@ const init = async () => {
 	const [page] = await browser.pages();
 
 	await goToHomepage(page);
-	await getData(page);
+	const data = await getData(page);
     browser.close();
+    return data;
 };
 
 const goToHomepage = async (page) => {
@@ -163,6 +180,45 @@ const getData = async (page) => {
 		}
 	}
 	console.log(dataArray);
+    return dataArray
 };
 
-init();
+app.get('/getData', async(req,res) => {
+    try{
+        const data = await init();
+        res.json(data)
+    } catch(error) {
+        console.error('Error scraping game data: ', error);
+        res.status(500).send('Error retrieving game data.')
+    }
+})
+
+app.post('/postData', async(req,res) => {
+    try{
+        await client.connect();
+        const data = {
+            gameName: req.body.gameName,
+            genres: req.body.genres,
+            tags: req.body.tags,
+            releaseDate: req.body.releaseDate,
+            price: req.body.price,
+            owners: req.body.owners,
+            playerPeak: req.body.playerPeak
+        }
+
+        const collection = client.db("DEV5").collection("game-data");
+        const insertData = await collection.insertOne(data)
+        res.status(201).send({
+            status: "Saved",
+            message: "Game data has been saved",
+            data: insertData
+        })
+    } catch(error){
+        console.error('Error posting data to DB: ', error);
+    }
+})
+
+app.listen(port, () => {
+    console.log('Server is running on port ' + port);
+    
+})
