@@ -4,6 +4,7 @@ import puppeteer from "puppeteer";
 import express from 'express';
 import cors from 'cors';
 import { MongoClient, ServerApiVersion } from "mongodb";
+import axios from "axios";
 
 const uri = process.env.MONGODB_URI
 const app = express();
@@ -168,15 +169,25 @@ const getData = async (page) => {
                 date: yesterdaysDate
             }
 
-			dataArray.push({
-				gameName: gameName,
-				genres: genres,
+			const gameData = {
+                gameName: gameName,
+                genres: genres,
                 tags: tags,
                 releaseDate: releaseDate,
                 price: price,
                 owners: owners,
-                playerPeak: playerPeak 
-			});
+                playerPeak: playerPeak
+            };
+
+            dataArray.push(gameData);
+
+            // Send POST request to store the data in DB
+            try {
+                await axios.post('http://localhost:3000/postData', gameData);
+                console.log(`Data for ${gameName} has been posted to the DB.`);
+            } catch (error) {
+                console.error(`Error posting data for ${gameName}:`, error);
+            }
 		}
 	}
 	console.log(dataArray);
