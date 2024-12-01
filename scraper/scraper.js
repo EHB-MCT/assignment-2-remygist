@@ -54,6 +54,7 @@ const init = async () => {
                 '--remote-debugging-port=9222',
             ],
             timeout: 60000,
+            protocolTimeout: 60000,
         });
         console.log('Browser launched successfully!');
         // Use the first page opened
