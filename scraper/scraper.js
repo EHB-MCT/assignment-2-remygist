@@ -1,6 +1,7 @@
 "use strict";
 import "dotenv/config";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import { MongoClient, ServerApiVersion } from "mongodb";
@@ -9,6 +10,7 @@ import axios from "axios";
 const uri = process.env.MONGODB_URI
 const app = express();
 const port = 3000;
+const isRender = process.env.RENDER === 'true';
 app.use(express.json());
 app.use(cors());
 
@@ -22,32 +24,59 @@ const client = new MongoClient(uri, {
 
 client.connect().then(() => {
     console.log("Connected to MongoDB");
-  }).catch(err => {
+}).catch(err => {
     console.error("Failed to connect to MongoDB", err);
-  });
+});
 
 const linksArray = [];
 const dataArray = [];
+const executablePath = process.env.RENDER
+? '/opt/render/project/src/node_modules/.cache/puppeteer/chrome/linux-131.0.6778.85/chrome-linux64/chrome'
+: puppeteer.executablePath(); // For local, use the default executable path
+
+if (!executablePath) {
+throw new Error('Puppeteer executable path is not defined.');
+}
 
 const init = async () => {
     console.log("init");
     // Launch the browser and open a new blank page
-    const browser = await puppeteer.launch({
-        headless: false,
-    });
-    // Use the first page opened
-    const [page] = await browser.pages();
+    try {
+        const browser = await puppeteer.launch({
+            executablePath: executablePath || puppeteer.executablePath(),
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-gpu',
+                '--window-size=1280x1024',
+                '--disable-dev-shm-usage',
+                '--remote-debugging-port=9222',
+            ],
+            timeout: 60000,
+            protocolTimeout: 60000,
+        });
+        console.log('Browser launched successfully!');
+        // Use the first page opened
+        const [page] = await browser.pages();
 
-    await goToHomepage(page);
-    const data = await getData(page);
-    browser.close();
-    return data;
+        await goToHomepage(page);
+        const data = await getData(page);
+        browser.close();
+        return data;
+    } catch (error) {
+        console.error('Error launching browser:', error);
+        // You can log additional info to help with debugging
+        console.error('Error details:', error.stack);
+    }
+
 };
 
 const goToHomepage = async (page) => {
     // Navigate the page to a URL
     try {
         await page.goto(process.env.BASE_URL, {
+            timeout: 60000,
             waitUntil: "domcontentloaded",
         });
     } catch (error) {
@@ -58,7 +87,7 @@ const goToHomepage = async (page) => {
 const getData = async (page) => {
     const links = await page.$$("[data-order] a");
     let gameCount = 0;
-    for (const link of links.slice(0, 5)) {
+    for (const link of links.slice(0, 100)) {
         const href = await page.evaluate((el) => el.href, link);
         linksArray.push(href);
     }
@@ -232,35 +261,35 @@ app.post('/postData', async (req, res) => {
             if (!dateExists) {
                 // Update amount of owners
                 const updatedOwners = {
-                  min: owners.min,
-                  max: owners.max,
-                  average: owners.average
+                    min: owners.min,
+                    max: owners.max,
+                    average: owners.average
                 };
-        
+
                 // Perform the update
                 const updatedData = await collection.updateOne(
-                  { gameName },
-                  {
-                    $set: {
-                      owners: updatedOwners
-                    },
-                    $push: {
-                      playerPeak: playerPeak
+                    { gameName },
+                    {
+                        $set: {
+                            owners: updatedOwners
+                        },
+                        $push: {
+                            playerPeak: playerPeak
+                        }
                     }
-                  }
                 );
-        
+
                 res.status(200).send({
-                  status: "Updated",
-                  message: "Game data has been updated",
-                  data: updatedData
+                    status: "Updated",
+                    message: "Game data has been updated",
+                    data: updatedData
                 });
-              } else {
+            } else {
                 res.status(200).send({
-                  status: "No Update",
-                  message: "Player data already exists for the given date"
+                    status: "No Update",
+                    message: "Player data already exists for the given date"
                 });
-              }
+            }
         } else {
             // new record
             const newData = {
