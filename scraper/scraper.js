@@ -46,15 +46,16 @@ const init = async () => {
             executablePath: executablePath || puppeteer.executablePath(),
             headless: true,
             args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-gpu',
-                '--window-size=1280x1024',
-                '--disable-dev-shm-usage',
-                '--remote-debugging-port=9222',
+                 '--no-sandbox', 
+                 '--disable-setuid-sandbox', 
+                 '--disable-dev-shm-usage', 
+                 '--disable-gpu', 
+                 '--disable-accelerated-2d-canvas', 
+                 '--no-zygote', 
+                 '--single-process',
             ],
-            timeout: 60000,
-            protocolTimeout: 60000,
+            timeout: 180000,
+            protocolTimeout: 180000,
         });
         console.log('Browser launched successfully!');
         // Use the first page opened
