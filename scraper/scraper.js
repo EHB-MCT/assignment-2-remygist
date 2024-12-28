@@ -40,13 +40,14 @@ if (!executablePath) {
 
 const init = async () => {
     console.log("init");
-    const MAX_RETRIES = 3; 
-    const RETRY_DELAY = 5000; 
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 5000;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        let browser = null;
         try {
             console.log(`Attempt ${attempt} to launch the browser.`);
-            const browser = await puppeteer.launch({
+            browser = await puppeteer.launch({
                 executablePath: executablePath || puppeteer.executablePath(),
                 headless: true,
                 args: [
@@ -65,17 +66,35 @@ const init = async () => {
             });
             console.log('Browser launched successfully!');
 
-            // Use the first page opened
             const [page] = await browser.pages();
+            if (!page) {
+                throw new Error('No page instance found after launching the browser.');
+            }
 
+            // Navigate to homepage and fetch data
             await goToHomepage(page);
+
+            // Fetch data from the page
             const data = await getData(page);
+
+            // Close the browser only after operations are complete
             await browser.close();
             return data;
+
         } catch (error) {
             console.error(`Error during attempt ${attempt}:`, error.message);
             console.error('Error details:', error.stack);
 
+            // Ensure the browser is closed if an error occurs
+            if (browser) {
+                try {
+                    await browser.close();
+                } catch (closeError) {
+                    console.error('Error closing browser:', closeError.message);
+                }
+            }
+
+            // Retry after a delay
             if (attempt < MAX_RETRIES) {
                 console.log(`Retrying in ${RETRY_DELAY / 1000} seconds...`);
                 await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
@@ -85,20 +104,33 @@ const init = async () => {
         }
     }
 
-    // Return null or throw an error if all attempts fail
-    throw new Error('Failed to launch browser after maximum retries.');
+    // If all attempts fail, throw an error
+    throw new Error('Failed to launch browser and retrieve data after maximum retries.');
 };
 
 
 const goToHomepage = async (page) => {
-    // Navigate the page to a URL
-    try {
-        await page.goto(process.env.BASE_URL, {
-            timeout: 180000,
-            waitUntil: "networkidle2",
-        });
-    } catch (error) {
-        console.error("Failed to navigate to homepage:", error);
+    let attempts = 0;
+    const MAX_ATTEMPTS = 3;
+
+    while (attempts < MAX_ATTEMPTS) {
+        try {
+            attempts++;
+            console.log(`Navigating to homepage, attempt ${attempts}`);
+            await page.goto(process.env.BASE_URL, {
+                timeout: 300000,
+                waitUntil: "networkidle2", // Wait until the page has no network requests for 500ms
+            });
+            console.log("Successfully navigated to homepage.");
+            return; // Exit the function on success
+        } catch (error) {
+            console.error(`Error navigating to homepage (attempt ${attempts}):`, error.message);
+            if (attempts >= MAX_ATTEMPTS) {
+                throw new Error('Failed to navigate to homepage after maximum attempts.');
+            }
+            // Retry after a brief delay
+            await new Promise(resolve => setTimeout(resolve, 5000));
+        }
     }
 };
 
