@@ -31,7 +31,7 @@ client.connect().then(() => {
 const linksArray = [];
 const dataArray = [];
 const executablePath = process.env.RENDER
-? '/opt/render/project/src/node_modules/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome'
+? '/opt/render/project/src/node_modules/.cache/puppeteer/chrome/linux-131.0.6778.85/chrome-linux64/chrome'
 : puppeteer.executablePath(); // For local, use the default executable path
 
 if (!executablePath) {
