@@ -31,46 +31,64 @@ client.connect().then(() => {
 const linksArray = [];
 const dataArray = [];
 const executablePath = process.env.RENDER
-? '/opt/render/project/src/node_modules/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome'
-: puppeteer.executablePath(); // For local, use the default executable path
+    ? '/opt/render/project/src/node_modules/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome'
+    : puppeteer.executablePath(); // For local, use the default executable path
 
 if (!executablePath) {
-throw new Error('Puppeteer executable path is not defined.');
+    throw new Error('Puppeteer executable path is not defined.');
 }
 
 const init = async () => {
     console.log("init");
-    // Launch the browser and open a new blank page
-    try {
-        const browser = await puppeteer.launch({
-            executablePath: executablePath || puppeteer.executablePath(),
-            headless: true,
-            args: [
-                 '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-gpu',
-                '--window-size=1280x1024',
-                '--disable-dev-shm-usage',
-                '--remote-debugging-port=9222',
-            ],
-            timeout: 180000,
-            protocolTimeout: 180000,
-        });
-        console.log('Browser launched successfully!');
-        // Use the first page opened
-        const [page] = await browser.pages();
+    const MAX_RETRIES = 3; 
+    const RETRY_DELAY = 5000; 
 
-        await goToHomepage(page);
-        const data = await getData(page);
-        browser.close();
-        return data;
-    } catch (error) {
-        console.error('Error launching browser:', error);
-        // You can log additional info to help with debugging
-        console.error('Error details:', error.stack);
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            console.log(`Attempt ${attempt} to launch the browser.`);
+            const browser = await puppeteer.launch({
+                executablePath: executablePath || puppeteer.executablePath(),
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-gpu',
+                    '--disable-dev-shm-usage',
+                    '--remote-debugging-port=9222',
+                    '--single-process',
+                    '--headless=new',
+                    '--disable-background-timer-throttling',
+                    '--disable-backgrounding-occluded-windows',
+                ],
+                timeout: 300000,
+                protocolTimeout: 300000,
+            });
+            console.log('Browser launched successfully!');
+
+            // Use the first page opened
+            const [page] = await browser.pages();
+
+            await goToHomepage(page);
+            const data = await getData(page);
+            await browser.close();
+            return data;
+        } catch (error) {
+            console.error(`Error during attempt ${attempt}:`, error.message);
+            console.error('Error details:', error.stack);
+
+            if (attempt < MAX_RETRIES) {
+                console.log(`Retrying in ${RETRY_DELAY / 1000} seconds...`);
+                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+            } else {
+                console.error('All retry attempts failed. Exiting init function.');
+            }
+        }
     }
 
+    // Return null or throw an error if all attempts fail
+    throw new Error('Failed to launch browser after maximum retries.');
 };
+
 
 const goToHomepage = async (page) => {
     // Navigate the page to a URL
