@@ -76,8 +76,8 @@ const goToHomepage = async (page) => {
     // Navigate the page to a URL
     try {
         await page.goto(process.env.BASE_URL, {
-            timeout: 60000,
-            waitUntil: "domcontentloaded",
+            timeout: 180000,
+            waitUntil: "networkidle2",
         });
     } catch (error) {
         console.error("Failed to navigate to homepage:", error);
