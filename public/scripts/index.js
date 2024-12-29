@@ -21,6 +21,9 @@ async function fetchData() {
         const priceDistribution = await getPriceDistribution();
         createPriceDistributionChart("priceDistributionChart", "Price Distribution of Games", priceDistribution);
 
+        // Create a bar chart for the Biggest Peak Players
+        const top3games = await getTop3GamesByPeakPlayers();
+        createHorizontalBarChartTop3("top3games", "Top 3 Highest peak of players", top3games)
 
     } catch (error) {
         console.log(error);
@@ -164,7 +167,6 @@ async function getPriceDistribution() {
     return priceBrackets;
 }
 
-// Create a bar chart for the price distribution
 function createPriceDistributionChart(canvasId, title, priceDistribution) {
     const labels = Object.keys(priceDistribution);  // Price bracket labels
     const values = Object.values(priceDistribution);  // Number of games in each price bracket
@@ -213,5 +215,73 @@ function createPriceDistributionChart(canvasId, title, priceDistribution) {
         }
     });
 }
+
+async function getTop3GamesByPeakPlayers() {
+    console.log("Finding top 3 games by peak players");
+
+    const gamePeaks = data.map(game => {
+        const highestPeak = game.playerPeak.length > 0
+            ? Math.max(...game.playerPeak.map(peak => peak.players))
+            : 0;
+
+        return {
+            name: game.gameName, 
+            highestPeak: highestPeak
+        };
+    });
+
+    // Sort the games by highest player peak in descending order
+    gamePeaks.sort((a, b) => b.highestPeak - a.highestPeak);
+    const top3Games = gamePeaks.slice(0, 3);
+
+    console.log(top3Games);
+    return top3Games;  
+}
+
+function createHorizontalBarChartTop3(canvasId, title, top3Games) {
+    const labels = top3Games.map(game => game.name);
+    const values = top3Games.map(game => game.highestPeak);
+
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Peak Players',
+                data: values,
+                backgroundColor: 'rgba(75, 192, 192, 0.7)'
+            }]
+        },
+        options: {
+            responsive: true,
+            indexAxis: 'y',  // Makes it horizontal
+            plugins: {
+                title: {
+                    display: true,
+                    text: title
+                }
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Peak Players'
+                    },
+                    beginAtZero: true
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Games'
+                    }
+                }
+            }
+        }
+    });
+}
+
+
+
 
 fetchData();
