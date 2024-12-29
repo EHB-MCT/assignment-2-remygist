@@ -47,6 +47,7 @@ const init = async () => {
         let browser = null;
         try {
             console.log(`Attempt ${attempt} to launch the browser.`);
+            
             browser = await puppeteer.launch({
                 executablePath: executablePath || puppeteer.executablePath(),
                 headless: true,
@@ -64,6 +65,7 @@ const init = async () => {
                 timeout: 300000,
                 protocolTimeout: 300000,
             });
+
             console.log('Browser launched successfully!');
 
             const [page] = await browser.pages();
@@ -71,13 +73,17 @@ const init = async () => {
                 throw new Error('No page instance found after launching the browser.');
             }
 
-            // Navigate to homepage and fetch data
+            // Add event listeners to debug page closures
+            page.on('close', () => console.error('Page unexpectedly closed.'));
+            browser.on('disconnected', () => console.error('Browser unexpectedly disconnected.'));
+
+            // Navigate to homepage
             await goToHomepage(page);
 
-            // Fetch data from the page
+            // Fetch data
             const data = await getData(page);
 
-            // Close the browser only after operations are complete
+            // Close browser after operations
             await browser.close();
             return data;
 
@@ -85,7 +91,7 @@ const init = async () => {
             console.error(`Error during attempt ${attempt}:`, error.message);
             console.error('Error details:', error.stack);
 
-            // Ensure the browser is closed if an error occurs
+            // Ensure browser is closed on failure
             if (browser) {
                 try {
                     await browser.close();
@@ -104,7 +110,6 @@ const init = async () => {
         }
     }
 
-    // If all attempts fail, throw an error
     throw new Error('Failed to launch browser and retrieve data after maximum retries.');
 };
 
@@ -117,11 +122,22 @@ const goToHomepage = async (page) => {
         try {
             attempts++;
             console.log(`Navigating to homepage, attempt ${attempts}`);
-            await page.goto(process.env.BASE_URL, {
+            
+            // Navigate to URL
+            const response = await page.goto(process.env.BASE_URL, {
                 timeout: 300000,
-                waitUntil: "networkidle2", // Wait until the page has no network requests for 500ms
+                waitUntil: "domcontentloaded", // Use a lighter wait option
             });
+
+            if (!response || !response.ok()) {
+                throw new Error(`Navigation failed with status: ${response?.status()}`);
+            }
+
             console.log("Successfully navigated to homepage.");
+            
+            // Ensure a key element is present
+            await page.waitForSelector("[data-order] a", { timeout: 10000 });
+            console.log("Homepage is stable and ready.");
             return; // Exit the function on success
         } catch (error) {
             console.error(`Error navigating to homepage (attempt ${attempts}):`, error.message);
