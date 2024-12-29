@@ -31,56 +31,122 @@ client.connect().then(() => {
 const linksArray = [];
 const dataArray = [];
 const executablePath = process.env.RENDER
-? '/opt/render/project/src/node_modules/.cache/puppeteer/chrome/linux-131.0.6778.85/chrome-linux64/chrome'
-: puppeteer.executablePath(); // For local, use the default executable path
+    ? '/opt/render/project/src/node_modules/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome'
+    : puppeteer.executablePath(); // For local, use the default executable path
 
 if (!executablePath) {
-throw new Error('Puppeteer executable path is not defined.');
+    throw new Error('Puppeteer executable path is not defined.');
 }
 
 const init = async () => {
     console.log("init");
-    // Launch the browser and open a new blank page
-    try {
-        const browser = await puppeteer.launch({
-            executablePath: executablePath || puppeteer.executablePath(),
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-gpu',
-                '--window-size=1280x1024',
-                '--disable-dev-shm-usage',
-                '--remote-debugging-port=9222',
-            ],
-            timeout: 60000,
-            protocolTimeout: 60000,
-        });
-        console.log('Browser launched successfully!');
-        // Use the first page opened
-        const [page] = await browser.pages();
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 5000;
 
-        await goToHomepage(page);
-        const data = await getData(page);
-        browser.close();
-        return data;
-    } catch (error) {
-        console.error('Error launching browser:', error);
-        // You can log additional info to help with debugging
-        console.error('Error details:', error.stack);
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        let browser = null;
+        try {
+            console.log(`Attempt ${attempt} to launch the browser.`);
+            
+            browser = await puppeteer.launch({
+                executablePath: executablePath || puppeteer.executablePath(),
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-gpu',
+                    '--disable-dev-shm-usage',
+                    '--remote-debugging-port=9222',
+                    '--single-process',
+                    '--headless=new',
+                    '--disable-background-timer-throttling',
+                    '--disable-backgrounding-occluded-windows',
+                ],
+                timeout: 300000,
+                protocolTimeout: 300000,
+            });
+
+            console.log('Browser launched successfully!');
+
+            const [page] = await browser.pages();
+            if (!page) {
+                throw new Error('No page instance found after launching the browser.');
+            }
+
+            // Add event listeners to debug page closures
+            page.on('close', () => console.error('Page unexpectedly closed.'));
+            browser.on('disconnected', () => console.error('Browser unexpectedly disconnected.'));
+
+            // Navigate to homepage
+            await goToHomepage(page);
+
+            // Fetch data
+            const data = await getData(page);
+
+            // Close browser after operations
+            await browser.close();
+            return data;
+
+        } catch (error) {
+            console.error(`Error during attempt ${attempt}:`, error.message);
+            console.error('Error details:', error.stack);
+
+            // Ensure browser is closed on failure
+            if (browser) {
+                try {
+                    await browser.close();
+                } catch (closeError) {
+                    console.error('Error closing browser:', closeError.message);
+                }
+            }
+
+            // Retry after a delay
+            if (attempt < MAX_RETRIES) {
+                console.log(`Retrying in ${RETRY_DELAY / 1000} seconds...`);
+                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+            } else {
+                console.error('All retry attempts failed. Exiting init function.');
+            }
+        }
     }
 
+    throw new Error('Failed to launch browser and retrieve data after maximum retries.');
 };
 
+
 const goToHomepage = async (page) => {
-    // Navigate the page to a URL
-    try {
-        await page.goto(process.env.BASE_URL, {
-            timeout: 60000,
-            waitUntil: "domcontentloaded",
-        });
-    } catch (error) {
-        console.error("Failed to navigate to homepage:", error);
+    let attempts = 0;
+    const MAX_ATTEMPTS = 3;
+
+    while (attempts < MAX_ATTEMPTS) {
+        try {
+            attempts++;
+            console.log(`Navigating to homepage, attempt ${attempts}`);
+            
+            // Navigate to URL
+            const response = await page.goto(process.env.BASE_URL, {
+                timeout: 300000,
+                waitUntil: "domcontentloaded", // Use a lighter wait option
+            });
+
+            if (!response || !response.ok()) {
+                throw new Error(`Navigation failed with status: ${response?.status()}`);
+            }
+
+            console.log("Successfully navigated to homepage.");
+            
+            // Ensure a key element is present
+            await page.waitForSelector("[data-order] a", { timeout: 10000 });
+            console.log("Homepage is stable and ready.");
+            return; // Exit the function on success
+        } catch (error) {
+            console.error(`Error navigating to homepage (attempt ${attempts}):`, error.message);
+            if (attempts >= MAX_ATTEMPTS) {
+                throw new Error('Failed to navigate to homepage after maximum attempts.');
+            }
+            // Retry after a brief delay
+            await new Promise(resolve => setTimeout(resolve, 5000));
+        }
     }
 };
 
