@@ -25,6 +25,10 @@ async function fetchData() {
         const top3games = await getTop3GamesByPeakPlayers();
         createHorizontalBarChartTop3("top3games", "Top 3 Highest peak of players", top3games)
 
+        // Create a bar chart for the Most Owned Games
+        const mostOwnedGames = await countMostOwnedGames();
+        createTopGamesBarChart("mostOwnedGames", "Most Owned Games", mostOwnedGames);
+
     } catch (error) {
         console.log(error);
     }
@@ -281,6 +285,61 @@ function createHorizontalBarChartTop3(canvasId, title, top3Games) {
     });
 }
 
+// Count most own games
+async function countMostOwnedGames() {
+    console.log("Counting most owned games...");
+
+    // Sort games by average number of owners
+    const sortedGames = data
+        .filter(game => game.owners && game.owners.average)  // Filter out games without ownership data
+        .sort((a, b) => b.owners.average - a.owners.average)  // Sort by owners.average in descending order
+        .slice(0, 10);  // Get the top 3 games
+
+    console.log(sortedGames);
+    return sortedGames;
+}
+
+function createTopGamesBarChart(canvasId, title, topGames) {
+    const labels = topGames.map(game => game.gameName);  // Game names
+    const values = topGames.map(game => game.owners.average);  // Average number of owners for each game
+
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Average Number of Owners',
+                data: values,
+                backgroundColor: 'rgba(75, 192, 192, 0.7)'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: title
+                }
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Games'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Average Number of Owners'
+                    },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
 
 
 
