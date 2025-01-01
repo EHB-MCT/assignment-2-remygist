@@ -29,6 +29,11 @@ async function fetchData() {
         const mostOwnedGames = await countMostOwnedGames();
         createTopGamesBarChart("mostOwnedGames", "Most Owned Games", mostOwnedGames);
 
+        // Create stacked chart that shows the relationship between genres and tags
+        const tagGenreCount = await countTagsByGenre();
+        const { genres, datasets } = transformDataForStackedChart(tagGenreCount);
+        createStackedColumnChart("topTagsByGenre", "Top Tags and Their Genres", genres, datasets);
+
     } catch (error) {
         console.log(error);
     }
@@ -285,7 +290,7 @@ function createHorizontalBarChartTop3(canvasId, title, top3Games) {
     });
 }
 
-// Count most own games
+// Count most owned games
 async function countMostOwnedGames() {
     console.log("Counting most owned games...");
 
@@ -340,6 +345,127 @@ function createTopGamesBarChart(canvasId, title, topGames) {
         }
     });
 }
+
+async function countTagsByGenre() {
+    console.log("Counting tags by genre...");
+
+    const genreTagCount = {};
+    const tagFrequency = {};
+
+    // Count tags and genres
+    data.forEach(game => {
+        game.genres.forEach(genre => {
+            if (!genreTagCount[genre]) {
+                genreTagCount[genre] = {};
+            }
+
+            game.tags.forEach(tag => {
+                // Count tags for the genre
+                genreTagCount[genre][tag] = (genreTagCount[genre][tag] || 0) + 1;
+
+                // Count total tag frequency
+                tagFrequency[tag] = (tagFrequency[tag] || 0) + 1;
+            });
+        });
+    });
+
+    // Get top 10 genres based on total tag frequency
+    const topGenres = Object.entries(genreTagCount)
+        .sort((a, b) => {
+            const aTotalTags = Object.values(a[1]).reduce((sum, count) => sum + count, 0);
+            const bTotalTags = Object.values(b[1]).reduce((sum, count) => sum + count, 0);
+            return bTotalTags - aTotalTags;
+        })
+        .slice(0, 8)
+        .map(([genre]) => genre);
+
+    // Filter for the top 10 genres
+    const filteredTagGenreCount = {};
+    topGenres.forEach(genre => {
+        const tagsInGenre = genreTagCount[genre];
+
+        // Get top 5 tags for each genre
+        const topTags = Object.entries(tagsInGenre)
+            .sort((a, b) => b[1] - a[1]) // Sort by tag frequency
+            .slice(0, 3) // Limit to top 5 tags
+            .reduce((obj, [tag, count]) => {
+                obj[tag] = count;
+                return obj;
+            }, {});
+
+        filteredTagGenreCount[genre] = topTags;
+    });
+
+    console.log(filteredTagGenreCount);
+    return filteredTagGenreCount;
+}
+
+function transformDataForStackedChart(tagGenreCount) {
+    const genres = Object.keys(tagGenreCount); // Genres for x-axis
+    const tags = new Set(); // Collect all unique tags
+
+    // Gather all tags
+    genres.forEach(genre => {
+        Object.keys(tagGenreCount[genre]).forEach(tag => tags.add(tag));
+    });
+
+    // Convert tags to an array
+    const tagArray = Array.from(tags);
+
+    // Build datasets for each tag
+    const datasets = tagArray.map(tag => ({
+        label: tag,
+        data: genres.map(genre => tagGenreCount[genre][tag] || 0), // Tag count per genre
+        backgroundColor: `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(
+            Math.random() * 255
+        )}, ${Math.floor(Math.random() * 255)}, 0.7)`, // Random color for each tag
+    }));
+
+    return { genres, datasets };
+}
+
+function createStackedColumnChart(canvasId, title, genres, datasets) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: genres, // X-axis (genres)
+            datasets: datasets // Stacked bars for tags
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: title
+                },
+                legend: {
+                    display: false
+                },
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    title: {
+                        display: true,
+                        text: 'Genres'
+                    }
+                },
+                y: {
+                    stacked: true, 
+                    title: {
+                        display: true,
+                        text: 'Number of Tags'
+                    },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+
+
 
 
 
