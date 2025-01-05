@@ -1,5 +1,5 @@
 # Steam game data
-Steam Game Data Scraper is a tool that collects and stores data about Steam games automatically. It uses Puppeteer to scrape info like game names, genres, tags, release dates, prices, ownership stats, and player counts from SteamSpy. The data is saved in a MongoDB database, making it easy to use for analysis or visuals. Hosted on Render, it runs daily using Postman to keep the info up-to-date.
+Steam Game Data Scraper is a tool that collects and stores data about Steam games automatically. It uses Puppeteer to scrape info like game names, genres, tags, release dates, prices, ownership stats, and player counts from SteamSpy. The data is saved in a MongoDB database and is visualized using interactive charts created with Chart.js. These visuals include genre distributions, popular tags, and price ranges, providing actionable insights for analysis. Hosted on Render, it runs daily using Postman to keep the info up-to-date.
 
 ## Installation
 1. **Clone the repository**
@@ -14,12 +14,21 @@ Steam Game Data Scraper is a tool that collects and stores data about Steam game
 ## File structure
 ```
 steam-game-data/
-├── scrapers/
+├──public/
+│   └──charts/          # Functions to create the different kind of charts
+│   └──data/            # Functions that count and transforms the collected data
+│   └──scripts/         # Contains index.js and api.js
+│   └──styles/          # Contains styling files
+├── scraper/
 │   └── scraper.js      # All scraping and data handling logic
+├── server/
+│   └── server.js       # Fetches data from the database to show in the graphs
 ├── .env                       # Environment variables (e.g., database URL)
 ├── .gitignore                 # Ignore sensitive files in git
 ├── package.json               # Project metadata and dependencies
+├── render-build.sh            # Script for running application on Render properly
 └── README.md                  # Project documentation
+└── DATAFLOW.md                # Collected data documentation
 ```
 ## General rules
 - File naming:
@@ -51,18 +60,23 @@ The data that is being extracted are:
 - Peak concurrent players (yesterday's stats)
 This data is then structured and stored in a object in order to store it into a database.
 
-### Storing data into database:
+### Data verification:
 Once all the data is collected, the app will store the data into a [MongoDB](https://www.mongodb.com) database.
 But before storing new data into the database, there are a few verifications to be done:
    1. Check if all fields are filled with data, if it doesn't it will skip to the next data record.
    2. Check if the data is a duplicate:
       - If it is not a duplicate, it will insert the new record into the database. 
       - If it is a duplicate, the app will check wether the data is up to date. If it is, it goes to the next record, if it is not the data record will be updated.
+Take a look at the DATAFLOW.md file for further details.
+
 
 ### Hosting application:
 The application is hosted on [Render](https://dashboard.render.com/), which automatically builds and deploys the app using the ```./render-build.sh``` command. This script resolves the issue of Render not locating the Chromium browser required for Puppeteer to navigate and scrape data online. The solution was inspired by a response from the [Render community](https://community.render.com/t/error-could-not-found-chromium/9848/2).
 
 The purpose of hosting the application is to automate the data scraping process. To achieve this, [Postman](https://www.postman.com/) is used to schedule daily calls to the scraping endpoint, ensuring regular data collection without manual intervention.
+
+### Data visualization:
+The app uses [Chart.js](https://www.chartjs.org/) to create interactive graphs for visualizing the scraped data. 
 
 ## Endpoints:
 1. GET /getData
@@ -107,5 +121,6 @@ The following environment variables need to be set in a `.env` file:
 - [Render](https://dashboard.render.com/)
 - [Render community](https://community.render.com/t/error-could-not-found-chromium/9848/2)
 - [Postman](https://www.postman.com/)
+- [Chart.js](https://www.chartjs.org/)
 
 
